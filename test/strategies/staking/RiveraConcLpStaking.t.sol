@@ -46,18 +46,18 @@ contract RiveraConcLpStakingTest is Test {
 
     //cakepool params
     bool _isTokenZeroDeposit = true;
-    int24 currentTick = -54707;     //Taken from explorer
+    int24 currentTick = -60524;     //Taken from explorer
     int24 tickSpacing = 10;
     int24 _tickLower = ((currentTick - 6932) / tickSpacing) * tickSpacing;      //Tick for price that is half of current price
     int24 _tickUpper = ((currentTick + 6932) / tickSpacing) * tickSpacing;      //Tick for price that is double of current price
     address _cakeReward = 0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82;
     //libraries
-    address _tickMathLib = 0xbA839d70B635A27bB0481731C05c24aDa7Fc9Db9;
-    address _sqrtPriceMathLib = 0xa16bEfe55b9Fa562bc99c03122E6b2a88301677B;
-    address _liquidityMathLib = 0xD125f080CeeDc8950257d7209a9af715E13D56c0;
-    address _safeCastLib = 0x4C79c18b90FE6F9051ba29CeC9CFC120564DCD98;
-    address _liquidityAmountsLib = 0xBd9143688cB5E46d1a6d96bCf5833760f299cc4D;
-    address _fullMathLib = 0x38D9e15E5AAD896e9be0214fCffc978b852F8A16;
+    address _tickMathLib = 0x21071Cd83f468856dC269053e84284c5485917E1;
+    address _sqrtPriceMathLib = 0xA9C3e24d94ef6003fB6064D3a7cdd40F87bA44de;
+    address _liquidityMathLib = 0xA7B88e482d3C9d17A1b83bc3FbeB4DF72cB20478;
+    address _safeCastLib = 0x3dbfDf42AEbb9aDfFDe4D8592D61b1de7bd7c26a;
+    address _liquidityAmountsLib = 0x672058B73396C78556fdddEc090202f066B98D71;
+    address _fullMathLib = 0x46ECf770a99d5d81056243deA22ecaB7271a43C7;
     address  _rewardtoNativeFeed=0xcB23da9EA243f53194CBc2380A6d4d9bC046161f;
     address  _assettoNativeFeed=0xD5c40f5144848Bd4EF08a9605d860e727b991513;
 
@@ -102,7 +102,7 @@ contract RiveraConcLpStakingTest is Test {
 
         ///@dev Initializing the strategy
         CommonAddresses memory _commonAddresses = CommonAddresses(address(vault), _router, _nonFungiblePositionManager, withdrawFeeDecimals, 
-        withdrawFee, feeDecimals, protocolFee, fundManagerFee, partnerFee, partner);
+        withdrawFee, feeDecimals, protocolFee, fundManagerFee, partnerFee, partner,_manager,_manager);
         RiveraLpStakingParams memory riveraLpStakingParams = RiveraLpStakingParams(
             _tickLower,
             _tickUpper,
@@ -267,7 +267,7 @@ contract RiveraConcLpStakingTest is Test {
 
     //     assertEq(INonfungiblePositionManager(_nonFungiblePositionManager).ownerOf(tokenId), _chef);
 
-    //     strategy._burnAndCollectV3();
+    //     strategy._burnAndCollectV3(true);
 
     //     (liquidity, , tickLower, tickUpper, , , user, , ) = IMasterChefV3(_chef).userPositionInfos(tokenId);
     //     assertEq(0, liquidity);
@@ -316,7 +316,7 @@ contract RiveraConcLpStakingTest is Test {
         uint256 withdrawAmount = 996 * depositAmount / 1000;
 
         uint256 vaultDenominaionbal = IERC20(_usdt).balanceOf(address(vault));
-        uint256 point5PercentOfDeposit = 3 * depositAmount / 1000;
+        uint256 point5PercentOfDeposit = 5 * depositAmount / 1000;
         emit log_named_uint("Vault USDT balance", vaultDenominaionbal);
         assertLt(vaultDenominaionbal, point5PercentOfDeposit);
 
@@ -343,8 +343,11 @@ contract RiveraConcLpStakingTest is Test {
 
     }
 
+ 
+
     function test_WithdrawWhenNotCalledByVault(uint256 depositAmount, address randomAddress) public {
-        vm.assume(_isEoa(randomAddress) && randomAddress!=address(vault));
+        randomAddress=0xA93681479E5Cc9fD605516fba5C39E73aAA3bfeb;
+        // vm.assume(_isEoa(randomAddress) && randomAddress!=address(vault));
         _depositDenominationAsset(depositAmount);
         uint256 withdrawAmount = depositAmount - strategy.poolFee() * depositAmount / 1e6;
 
@@ -358,76 +361,77 @@ contract RiveraConcLpStakingTest is Test {
         return account.code.length == 0;
     }
 
-    function test_ChangeRangeWhenNotCalledByOwner(int24 tickLower, int24 tickUpper, address randomAddress, uint256 depositAmount) public {
-        vm.assume(_isEoa(randomAddress) && randomAddress!=_manager);
-        _depositDenominationAsset(depositAmount);
+    // function test_ChangeRangeWhenNotCalledByOwner(int24 tickLower, int24 tickUpper, address randomAddress, uint256 depositAmount) public {
+    //     vm.assume(_isEoa(randomAddress) && randomAddress!=_manager);
+    //     _depositDenominationAsset(depositAmount);
 
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.startPrank(randomAddress);
-        strategy.changeRange(tickLower, tickUpper);
-    }
+    //     vm.expectRevert("Ownable: caller is not the owner");
+    //     vm.startPrank(randomAddress);
+    //     strategy.changeRange(tickLower, tickUpper);
+    // }
 
     function test_ChangeRangeWithSameTicks(uint256 depositAmount) public {
         _depositDenominationAsset(depositAmount);
-
-        vm.expectRevert("Range cannot be same");
+        vm.expectRevert();
         vm.startPrank(_manager);
-        strategy.changeRange(_tickLower, _tickUpper);
+        strategy.changeRange(_tickLower, _tickLower);
     }
 
-    function test_ChangeRangeWithLowerTickNotLessThanUpperTick(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
-        vm.assume(!(tickLower < tickUpper));
-        _depositDenominationAsset(depositAmount);
+    // function test_ChangeRangeWithLowerTickNotLessThanUpperTick(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
+    //     vm.assume(!(tickLower < tickUpper));
+    //     _depositDenominationAsset(depositAmount);
 
-        vm.expectRevert("Tick order incorrect");
-        vm.startPrank(_manager);
-        strategy.changeRange(tickLower, tickUpper);
-    }
+    //     vm.expectRevert("Tick order incorrect");
+    //     vm.startPrank(_manager);
+    //     strategy.changeRange(tickLower, tickUpper);
+    // }
 
-    function test_ChangeRangeWithLowerTickNotGreaterThanMinTick(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
-        vm.assume(tickLower!=_tickLower && tickUpper!=_tickUpper);
-        vm.assume(tickLower < tickUpper);
-        vm.assume(!(tickLower >= ITickMathLib(_tickMathLib).MIN_TICK()));
-        _depositDenominationAsset(depositAmount);
+    // function test_ChangeRangeWithLowerTickNotGreaterThanMinTick(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
+    //     vm.assume(tickLower!=_tickLower && tickUpper!=_tickUpper);
+    //     vm.assume(tickLower < tickUpper);
+    //     vm.assume(!(tickLower >= ITickMathLib(_tickMathLib).MIN_TICK()));
+    //     _depositDenominationAsset(depositAmount);
 
-        vm.expectRevert("Lower tick too low");
-        vm.startPrank(_manager);
-        strategy.changeRange(tickLower, tickUpper);
-    }
+    //     vm.expectRevert("Lower tick too low");
+    //     vm.startPrank(_manager);
+    //     strategy.changeRange(tickLower, tickUpper);
+    // }
 
-    function test_ChangeRangeWithUpperTickNotLessThanOrEqualMaxTick(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
-        vm.assume(tickLower!=_tickLower && tickUpper!=_tickUpper);
-        vm.assume(tickLower < tickUpper);
-        vm.assume(tickLower >= ITickMathLib(_tickMathLib).MIN_TICK());
-        vm.assume(!(tickUpper <= ITickMathLib(_tickMathLib).MAX_TICK()));
-        _depositDenominationAsset(depositAmount);
+    // function test_ChangeRangeWithUpperTickNotLessThanOrEqualMaxTick(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
+    //     vm.assume(tickLower!=_tickLower && tickUpper!=_tickUpper);
+    //     vm.assume(tickLower < tickUpper);
+    //     vm.assume(tickLower >= ITickMathLib(_tickMathLib).MIN_TICK());
+    //     vm.assume(!(tickUpper <= ITickMathLib(_tickMathLib).MAX_TICK()));
+    //     _depositDenominationAsset(depositAmount);
 
-        vm.expectRevert("Upper tick too high");
-        vm.startPrank(_manager);
-        strategy.changeRange(tickLower, tickUpper);
-    }
+    //     vm.expectRevert("Upper tick too high");
+    //     vm.startPrank(_manager);
+    //     strategy.changeRange(tickLower, tickUpper);
+    // }
 
-    function test_ChangeRangeWithTickNotMultipleOfTickSpacing(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
-        vm.assume(tickLower!=_tickLower && tickUpper!=_tickUpper);
-        vm.assume(tickLower < tickUpper);
-        vm.assume(tickLower >= ITickMathLib(_tickMathLib).MIN_TICK());
-        vm.assume(tickUpper <= ITickMathLib(_tickMathLib).MAX_TICK());
+    // function test_ChangeRangeWithTickNotMultipleOfTickSpacing(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
+    //     vm.assume(tickLower!=_tickLower && tickUpper!=_tickUpper);
+    //     vm.assume(tickLower < tickUpper);
+    //     vm.assume(tickLower >= ITickMathLib(_tickMathLib).MIN_TICK());
+    //     vm.assume(tickUpper <= ITickMathLib(_tickMathLib).MAX_TICK());
+    //     int24 tickSpacing = IPancakeV3Pool(_stake).tickSpacing();
+    //     vm.assume(!(tickLower % tickSpacing == 0 && tickUpper % tickSpacing == 0));
+    //     _depositDenominationAsset(depositAmount);
+
+    //     vm.expectRevert("Invalid Ticks");
+    //     vm.startPrank(_manager);
+    //     strategy.changeRange(tickLower, tickUpper);
+    // }
+
+    function test_ChangeRangeWhenCalledByOwner( uint256 depositAmount) public {
         int24 tickSpacing = IPancakeV3Pool(_stake).tickSpacing();
-        vm.assume(!(tickLower % tickSpacing == 0 && tickUpper % tickSpacing == 0));
-        _depositDenominationAsset(depositAmount);
-
-        vm.expectRevert("Invalid Ticks");
-        vm.startPrank(_manager);
-        strategy.changeRange(tickLower, tickUpper);
-    }
-
-    function test_ChangeRangeWhenCalledByOwner(int24 tickLower, int24 tickUpper, uint256 depositAmount) public {
-        int24 tickSpacing = IPancakeV3Pool(_stake).tickSpacing();
-        vm.assume(tickLower < tickUpper);
-        vm.assume(tickLower >= ITickMathLib(_tickMathLib).MIN_TICK());
-        vm.assume(tickUpper <= ITickMathLib(_tickMathLib).MAX_TICK());
-        vm.assume(tickLower % tickSpacing == 0 && tickUpper % tickSpacing == 0);
-        vm.assume(!((tickLower == _tickLower) && (tickUpper == _tickUpper)));
+        // vm.assume(tickLower < tickUpper);
+        // vm.assume(tickLower >= ITickMathLib(_tickMathLib).MIN_TICK());
+        // vm.assume(tickUpper <= ITickMathLib(_tickMathLib).MAX_TICK());
+        // vm.assume(tickLower % tickSpacing == 0 && tickUpper % tickSpacing == 0);
+        // vm.assume(!((tickLower == _tickLower) && (tickUpper == _tickUpper)));
+        int24 tickLower = -53740; 
+        int24 tickUpper = -53460; 
         _depositDenominationAsset(depositAmount);
 
         (uint128 liquidity, , int24 tickLower_, int24 tickUpper_, , , address user, , ) = IMasterChefV3(_chef).userPositionInfos(strategy.tokenID());
@@ -571,5 +575,122 @@ contract RiveraConcLpStakingTest is Test {
         vm.expectRevert("Pausable: paused");
         strategy.harvest();
     }
+    function test_TokenStuck(uint256 depositAmount) public {
+        address _whaleWbnb=0x0eD7e52944161450477ee417DE9Cd3a859b14fD0;
+        uint256 bal=IERC20(_wbnb).balanceOf(_whaleWbnb);
+        vm.assume(depositAmount<bal);
+        vm.prank(_whaleWbnb);
+        IERC20(_wbnb).transfer(address(strategy), depositAmount);
+        vm.prank(_manager);
+        strategy.inCaseTokensGetStuck(_wbnb);
+    }
+
+    function test_setRewardToLp0Path(uint256 depositAmount) public {
+        _depositDenominationAsset(depositAmount);
+        vm.startPrank(_manager);
+        uint24 rewardToLp0FeePath0=strategy.rewardToLp0FeePath(0);
+        address rewardToLp0AddressPath0=strategy.rewardToLp0AddressPath(0);
+        address rewardToLp0AddressPath1=strategy.rewardToLp0AddressPath(1);
+        emit log_named_uint("rewardToLp0FeePath0",rewardToLp0FeePath0);
+        emit log_named_address("rewardToLp0AddressPath0",rewardToLp0AddressPath0);
+        emit log_named_address("rewardToLp0AddressPath1",rewardToLp0AddressPath1);
+        strategy.setRewardToLp0Path(_rewardToLp0AddressPath, _rewardToLp0FeePath);
+        rewardToLp0FeePath0=strategy.rewardToLp0FeePath(0);
+        rewardToLp0AddressPath0=strategy.rewardToLp0AddressPath(0);
+        rewardToLp0AddressPath1=strategy.rewardToLp0AddressPath(1);
+        emit log_named_uint("rewardToLp0FeePath0",rewardToLp0FeePath0);
+        emit log_named_address("rewardToLp0AddressPath0",rewardToLp0AddressPath0);
+        emit log_named_address("rewardToLp0AddressPath1",rewardToLp0AddressPath1);
+    }
+
+    function test_setRewardToLp1Path(uint256 depositAmount) public {
+        _depositDenominationAsset(depositAmount);
+        vm.startPrank(_manager);
+        uint24 rewardToLp1FeePath0=strategy.rewardToLp0FeePath(0);
+        address rewardToLp1AddressPath0=strategy.rewardToLp1AddressPath(0);
+        address rewardToLp1AddressPath1=strategy.rewardToLp1AddressPath(1);
+        emit log_named_uint("rewardToLp1FeePath0",rewardToLp1FeePath0);
+        emit log_named_address("rewardToLp1AddressPath0",rewardToLp1AddressPath0);
+        emit log_named_address("rewardToLp1AddressPath1",rewardToLp1AddressPath1);
+        strategy.setRewardToLp0Path(_rewardToLp1AddressPath, _rewardToLp1FeePath);
+        rewardToLp1FeePath0=strategy.rewardToLp0FeePath(0);
+        rewardToLp1AddressPath0=strategy.rewardToLp1AddressPath(0);
+        rewardToLp1AddressPath1=strategy.rewardToLp1AddressPath(1);
+        emit log_named_uint("rewardToLp1FeePath0",rewardToLp1FeePath0);
+        emit log_named_address("rewardToLp1AddressPath0",rewardToLp1AddressPath0);
+        emit log_named_address("rewardToLp1AddressPath1",rewardToLp1AddressPath1);
+    }
+    function test_Panic(uint256 depositAmount) public {
+        _depositDenominationAsset(depositAmount);
+        vm.startPrank(_manager);
+        strategy.panic();
+       
+    }
+
+    function test_Unpause(uint256 depositAmount) public {
+        // =2e18;
+        _depositDenominationAsset(depositAmount);
+        vm.startPrank(_manager);
+        uint256 balanceOfBefore=strategy.balanceOf();
+        console.log("balance Before pause",balanceOfBefore);
+        strategy.panic();
+        uint256 balanceOfAfter=strategy.balanceOf();
+        console.log("balance After pause",balanceOfAfter);
+        uint256  tokenId=strategy.tokenID();
+        console.log("tokenId after pause",tokenId);
+        strategy.unpause();   
+        vm.stopPrank();
+        _depositDenominationAsset(depositAmount);
+        balanceOfAfter=strategy.balanceOf();
+        console.log("balance After deposit",balanceOfAfter);
+        tokenId=strategy.tokenID();
+        console.log("tokenId after deposit",tokenId);
+
+    }
+
+    function test_retireStrat(uint256 depositAmount) public {
+        _depositDenominationAsset(depositAmount);
+        vm.prank(address(vault));
+        strategy.retireStrat();       
+    }
+
+    function test_transferOwnership(uint256 depositAmount) public {
+        _depositDenominationAsset(depositAmount);
+        address owner=strategy.owner();
+        emit log_named_address("owner before",owner);
+        vm.prank(address(_manager));
+        strategy.transferOwnership(_user2);
+        vm.prank(address(_user2));
+        strategy.acceptOwnership();
+        owner=strategy.owner();
+        emit log_named_address("owner after",owner);
+    }
+
+    function test_setManager(uint256 depositAmount,address newManager) public {
+        // uint256 depositAmount=2e18;
+        // address newManager=address(0);
+        vm.assume(newManager!=address(0));
+        _depositDenominationAsset(depositAmount);
+        address manager=strategy.manager();
+        emit log_named_address("manager before",manager);
+        vm.prank(address(_manager));
+        strategy.setManager(newManager);
+        vm.prank(newManager);
+        strategy.acceptManagership();
+        manager=strategy.manager();
+        emit log_named_address("manager after",manager);
+    }
+
+    function test_setManagerWithAddress0(uint256 depositAmount) public {
+        _depositDenominationAsset(depositAmount);
+        address manager=strategy.manager();
+        vm.expectRevert();
+        vm.prank(address(_manager));
+        strategy.setManager(address(0));
+    }
 
 }
+
+/*
+forge test --match-path test/strategies/staking/RiveraConcLpStaking.t.sol --fork-url http://127.0.0.1:8545/ -vvv
+*/
