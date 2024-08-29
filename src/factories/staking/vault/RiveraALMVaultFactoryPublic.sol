@@ -11,15 +11,15 @@ contract RiveraALMVaultFactoryPublic is IRiveraVaultFactory {
     address[] public allVaults;
 
     ///@notice fixed params that are required to deploy the pool
-    address public chef;
+    // address public chef;
     address public router;
     address public NonfungiblePositionManager;
     address public manager;
     address public stratFactory;
     VaultType public immutable vaultType = VaultType.PUBLIC;
 
-    constructor(address _chef, address _router, address _NonfungiblePositionManager, address _stratFactory) {
-        chef = _chef;
+    constructor(/*address _chef,*/ address _router, address _NonfungiblePositionManager, address _stratFactory) {
+        // chef = _chef;
         router = _router;
         NonfungiblePositionManager = _NonfungiblePositionManager;
         stratFactory = _stratFactory;
@@ -31,7 +31,7 @@ contract RiveraALMVaultFactoryPublic is IRiveraVaultFactory {
         createVaultParams.approvalDelay, createVaultParams.totalTvlCap);
         vaultAddress = address(vault);
         address stratAddress = RiveraALMStrategyFactory(stratFactory).createStrat(createVaultParams, vaultAddress, msg.sender, manager, router, NonfungiblePositionManager, 
-        chef, feeParams);
+        /*chef, */feeParams);
         vault.transferOwnership(msg.sender);
         vault.init(IStrategy(stratAddress));
         allVaults.push(vaultAddress);

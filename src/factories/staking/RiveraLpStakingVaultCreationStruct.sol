@@ -9,11 +9,11 @@ struct RiveraVaultParams {
     int24 tickLower;
     int24 tickUpper;
     address stake;
-    address[] rewardToLp0AddressPath;
-    uint24[] rewardToLp0FeePath;
-    address[] rewardToLp1AddressPath;
-    uint24[] rewardToLp1FeePath;
-    address  rewardtoNativeFeed;
+    // address[] rewardToLp0AddressPath;
+    // uint24[] rewardToLp0FeePath;
+    // address[] rewardToLp1AddressPath;
+    // uint24[] rewardToLp1FeePath;
+    // address  rewardtoNativeFeed;
     address  assettoNativeFeed;
     address tickMathLib;
     address sqrtPriceMathLib;
@@ -21,7 +21,7 @@ struct RiveraVaultParams {
     address safeCastLib;
     address liquidityAmountsLib;
     address fullMathLib;
-    string pendingReward;
+    // string pendingReward;
 }
 
 struct FeeParams {

@@ -16,11 +16,11 @@ struct RiveraVaultParams {
     int24 tickLower;
     int24 tickUpper;
     address stake;
-    address[] rewardToLp0AddressPath;
-    uint24[] rewardToLp0FeePath;
-    address[] rewardToLp1AddressPath;
-    uint24[] rewardToLp1FeePath;
-    address  rewardtoNativeFeed;
+    // address[] rewardToLp0AddressPath;
+    // uint24[] rewardToLp0FeePath;
+    // address[] rewardToLp1AddressPath;
+    // uint24[] rewardToLp1FeePath;
+    // address  rewardtoNativeFeed;
     address  assettoNativeFeed;
     address tickMathLib;
     address sqrtPriceMathLib;
@@ -28,18 +28,18 @@ struct RiveraVaultParams {
     address safeCastLib;
     address liquidityAmountsLib;
     address fullMathLib;
-    string pendingReward;
+    // string pendingReward;
 }
 
 struct FeeParams {
     uint256 withdrawFeeDecimals;//100
-    uint256 withdrawFee;//1
+    uint256 withdrawFee;//0
 
-    uint256 feeDecimals;//1000
-    uint256 protocolFee;//100
-    uint256 fundManagerFee;//25
-    uint256 partnerFee;//25
-    address partner;//0xc60fE42A279A7F0A2D440BA1B3f3991088f01ce7
+    uint256 feeDecimals;//100
+    uint256 protocolFee;//15
+    uint256 fundManagerFee;//0
+    uint256 partnerFee;//0
+    address partner;//
 }
 
 
@@ -62,16 +62,23 @@ interface IRiveraVaultFactoryV2
 
 
 
-contract DeployPublicVaultV2Mantle is Script {
+contract DeployPublicVaultV2MantleMainnet is Script {
 
     //factoru
-    IRiveraVaultFactoryV2 _factory=IRiveraVaultFactoryV2(0x55b0f90d25f06F12FfA9C573adE14221b6405427);
-
-    address _fsx=0x6dFB16bc471982f19DB32DEE9b6Fb40Db4503cBF;
-    address wbit=0x8734110e5e1dcF439c7F549db740E546fea82d66;
-    address musdt=0xa9b72cCC9968aFeC98A96239B5AA48d828e8D827;
-    address whaleFsx=0x3EB827c42055450FC3999567556154ABb105F989;
-    uint256 _maxUserBal = 15e24;
+    IRiveraVaultFactoryV2 _factory=IRiveraVaultFactoryV2(0x19F51834817708F2da9Ac7D0cc3eAFF0b6Ed17D7);
+    address _stake = 0xA125AF1A4704044501Fe12Ca9567eF1550E430e8;//mainnet
+    address _lpToken0=0x201EBa5CC46D216Ce6DC03F6a759e8E766e956aE;//mainnnet
+    address _lpToken1=0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111;//mainnnet
+    int24 _tickLower = 50940;
+    int24 _tickUpper = 97020;
+    uint256 _withdrawFeeDecimals=100;
+    uint256 _withdrawFee=0;
+    uint256 _feeDecimals=100;
+    uint256 _protocolFee=15;
+    uint256 _fundManagerFee=0;
+    uint256 _partnerFee=0;
+    address _partner=0x961Ef0b358048D6E34BDD1acE00D72b37B9123D7 ;
+    address  assettoNativeFeed=address(0);
     address _user1;
     address _user2;
     address _user3;  
@@ -87,42 +94,22 @@ contract DeployPublicVaultV2Mantle is Script {
     uint256 _privateKey3;
     uint256 _privateKey4;
 
-    int24 _tickLower = 46600;
-    int24 _tickUpper = 48700;
-    string pendingReward="pendingFusionX";
+    // string pendingReward="pendingFusionX";
     // address _reward = 0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82;
     // //libraries
-     address _tickMathLib =0x271d7594985F8CE8CB41c99761C5f42956ff6e5E;
-    address _sqrtPriceMathLib = 0x69e0778b9Ba7e795329Ec8971B1FE46fA783daF6;
-    address _liquidityMathLib = 0xE84a814B835E9F54e528Fb96205120E3bdA3f7d0;
-    address _safeCastLib = 0x070f86Ba8Af424e59e9FEA8509896BBD0b8dD0c5;
-    address _liquidityAmountsLib =0x00D4FDC04e86269cE7F4b1AcD985d5De0eA1C16d;
-    address _fullMathLib = 0x46b0D5C30537A800B12AF7a22D924F1636879965;
+     address _tickMathLib =0x74C5E75798b33D38abeE64f7EC63698B7e0a10f1;
+    address _sqrtPriceMathLib = 0xA38Bf51645D77bd0ec5072Ae5eCA7c0e67CFc081;
+    address _liquidityMathLib = 0xe6d2bD39aEFCDCFC989B03AE45A5aBEfe9BF1F51;
+    address _safeCastLib = 0x55FD5B67B115767036f9e8af569B281A8A544a12;
+    address _liquidityAmountsLib =0xE344B76f1Dec90E8a2e68fa7c1cfEBB329aFB332;
+    address _fullMathLib = 0xAa5Fd782B03Bfb2f25F13B6ae4e254F5149B9575;
 
     //usdt bnb pool
-    address _stake = 0x30F63e60Ab33B05f3baFf97E5A35010De6F4Ea9D;
 
-
-    //FSX / WBIT pool params
-    address[] rewardToLp0AddressPath = [_fsx,musdt,wbit];
-    uint24[] rewardToLp0FeePath = [2500,500];
-    address[] rewardToLp1AddressPath = [_fsx, wbit];
-    uint24[] rewardToLp1FeePath = [2500];
-    address  assettoNativeFeed=address(0);
-    address rewardtoNativeFeed=address(0);
-    uint256 depositAmount1=2e18;///vault 1 deposit amount
-    uint256 _withdrawFeeDecimals=100;
-    uint256 _withdrawFee=1;
-
-    uint256 _feeDecimals=1000;
-    uint256 _protocolFee=100;
-    uint256 _fundManagerFee=25;
-    uint256 _partnerFee=25;
-    address _partner=0xc60fE42A279A7F0A2D440BA1B3f3991088f01ce7 ;
 
 
     uint256 stratUpdateDelay = 172800;
-    uint256 vaultTvlCap = 10000e18;
+    uint256 vaultTvlCap = 100000e6;
     VaultType _vaultType;
 
     function setUp() public {
@@ -173,31 +160,31 @@ contract DeployPublicVaultV2Mantle is Script {
     function run() public {
 
         vm.startBroadcast(_privateKey2);
-        console.log("WhiteListed Vault Factory",address(_factory));
+        console.log("Vault Factory",address(_factory));
         console.log("======================Deploy Vaults====================");
-        console.log("create vault of FSX / WBIT pool");
+        console.log("create vault");
         RiveraVaultParams memory createVaultParamsFsxPool= RiveraVaultParams(
-            wbit,
+            _lpToken0,
             vaultTvlCap,
             stratUpdateDelay,
-            "Riv-FSX-WBIT-YT-X",
-            "Riv-FSX-WBIT-YT-X",
+            "RIV-01-01-Y",
+            "RIV-01-01-Y",
             _tickLower,
             _tickUpper,
             _stake,
-            rewardToLp0AddressPath,
-            rewardToLp0FeePath,
-            rewardToLp1AddressPath,
-            rewardToLp1FeePath,
-            rewardtoNativeFeed,
+            // rewardToLp0AddressPath,
+            // rewardToLp0FeePath,
+            // rewardToLp1AddressPath,
+            // rewardToLp1FeePath,
+            // rewardtoNativeFeed,
             assettoNativeFeed,
             _tickMathLib,
             _sqrtPriceMathLib,
             _liquidityMathLib,
             _safeCastLib,
             _liquidityAmountsLib,
-            _fullMathLib,
-            pendingReward
+            _fullMathLib
+            // pendingReward
 
         );
         FeeParams memory feeParams = FeeParams(
@@ -210,21 +197,22 @@ contract DeployPublicVaultV2Mantle is Script {
             _partner
         );
         address vaultFsxPool = _createVault(_factory,createVaultParamsFsxPool,feeParams);
-        console.log("Vault FSX / WBIT ",vaultFsxPool);
+        console.log("Vault RIV-01-01-Y ",vaultFsxPool);
         console.log("======================"); 
         vm.stopBroadcast(); 
         address[] memory vault=_factory.listAllVaults();
         console.log("all vaults",vault.length);
         console.log("======================Deposit in Vault====================");
+        uint256 depositAmount1=IERC20(_lpToken0).balanceOf(_user3)/2;///vault 1 deposit amount
         vm.startBroadcast(_privateKey3);
-        IERC20(wbit).approve(vaultFsxPool, depositAmount1);
+        IERC20(_lpToken0).approve(vaultFsxPool, depositAmount1);
         RiveraAutoCompoundingVaultV2Public(vaultFsxPool).deposit(depositAmount1, _user3);
+        console.log("deposited");
         vm.stopBroadcast();
-        vm.startBroadcast(_privateKey4);
-        IERC20(wbit).approve(vaultFsxPool, depositAmount1);
-        RiveraAutoCompoundingVaultV2Public(vaultFsxPool).deposit(depositAmount1, _user4);
-        vm.stopBroadcast();
-
+        // vm.startBroadcast(_privateKey4);
+        // IERC20(l_lpToken0).approve(vaultFsxPool, depositAmount1);
+        // RiveraAutoCompoundingVaultV2Public(vaultFsxPool).deposit(depositAmount1, _user4);
+        // vm.stopBroadcast();
     }
 
     function _createVault(IRiveraVaultFactoryV2 factory,RiveraVaultParams memory createVaultParams,FeeParams memory feeParams) internal returns (address vaultAddress){

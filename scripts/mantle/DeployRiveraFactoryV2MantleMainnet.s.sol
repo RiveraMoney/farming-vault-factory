@@ -7,11 +7,11 @@ import "@rivera/factories/staking/vault/RiveraALMVaultFactoryWhitelisted.sol";
 import "@rivera/factories/staking/vault/RiveraALMVaultFactoryPrivate.sol";
 import "@rivera/factories/staking/RiveraALMStrategyFactory.sol";
 
-contract DeployRiveraFactoryV2Mantle is Script {
+contract DeployRiveraFactoryV2MantleMainnet is Script {
   
-    address _chef = 0x9316938Eaa09E71CBB1Bf713212A42beCBa2998F;
-    address _router = 0xE3a68317a2F1c41E5B2efBCe2951088efB0Cf524;
-    address _NonfungiblePositionManager = 0x94705da51466F3Bb1E8c1591D71C09c9760f5F59;
+    // address _chef = 0x9316938Eaa09E71CBB1Bf713212A42beCBa2998F;//testnet till we get mainnet address
+    address _router = 0x4bf659cA398A73AaF73818F0c64c838B9e229c08;//maninnet
+    address _NonfungiblePositionManager =0x5752F085206AB87d8a5EF6166779658ADD455774;//maninnet
     VaultType _vaultType = VaultType.PUBLIC;
 
     function run() public {
@@ -36,7 +36,7 @@ contract DeployRiveraFactoryV2Mantle is Script {
     function _deployPublicVaultFactory(RiveraALMStrategyFactory stratFactory) internal returns (address vaultAddress){
         
         RiveraALMVaultFactoryPublic factory = new RiveraALMVaultFactoryPublic(
-            _chef,
+            // _chef,
             _router,
             _NonfungiblePositionManager,
             address(stratFactory)
@@ -47,7 +47,7 @@ contract DeployRiveraFactoryV2Mantle is Script {
      function _deployPrivateVaultFactory(RiveraALMStrategyFactory stratFactory) internal returns (address vaultAddress){
         
         RiveraALMVaultFactoryPrivate factory = new RiveraALMVaultFactoryPrivate(
-            _chef,
+            // _chef,
             _router,
             _NonfungiblePositionManager,
             address(stratFactory)
@@ -58,7 +58,7 @@ contract DeployRiveraFactoryV2Mantle is Script {
     function _deployWhitelistedVaultFactory(RiveraALMStrategyFactory stratFactory) internal returns (address vaultAddress){
         
         RiveraALMVaultFactoryWhitelisted factory = new RiveraALMVaultFactoryWhitelisted(
-            _chef,
+            // _chef,
             _router,
             _NonfungiblePositionManager,
             address(stratFactory)
