@@ -7,9 +7,7 @@ contract FeeManager is AbstractStrategyV2 {
     uint256 public withdrawFeeDecimals;
     uint256 public withdrawFee;
 
-    uint256 public feeDecimals;
-    uint256 public protocolFee;
-    uint256 public fundManagerFee;
-    uint256 public partnerFee;
-    address public partner;
+    uint256 public slippage;
+    uint256 public slippageDecimals;
+    
 }

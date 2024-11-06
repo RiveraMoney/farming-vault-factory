@@ -16,7 +16,7 @@ contract RiveraALMStrategyFactory {
 
         strategy.init(RiveraLpStakingParams(createVaultParams.tickLower, createVaultParams.tickUpper, createVaultParams.stake, createVaultParams.tickMathLib, 
         createVaultParams.sqrtPriceMathLib, createVaultParams.liquidityMathLib, createVaultParams.safeCastLib, createVaultParams.liquidityAmountsLib, createVaultParams.fullMathLib, createVaultParams.assettoNativeFeed), CommonAddresses(vaultAddress, router, nonfungiblePositionManager, feeParams.withdrawFeeDecimals, 
-        feeParams.withdrawFee, feeParams.feeDecimals, feeParams.protocolFee, feeParams.fundManagerFee, feeParams.partnerFee, feeParams.partner,manager,user));
+        feeParams.withdrawFee,feeParams.slippage,feeParams.slippageDecimals,manager,user));
         return address(strategy);
     }
 

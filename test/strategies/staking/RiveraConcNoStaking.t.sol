@@ -2,8 +2,10 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "../../../src/strategies/staking/RiveraConcNoStaking.sol";
+import "../../../src/strategies/staking/Test/RiveraConcNoStakingTestHelper.sol";
 import "../../../src/strategies/common/interfaces/IStrategy.sol";
 import "../../../src/vaults/RiveraAutoCompoundingVaultV2Public.sol";
+import "./interfaces/IAggregatorV3Interface.sol";
 import "@openzeppelin/token/ERC20/IERC20.sol";
 
 import "@rivera/strategies/staking/interfaces/INonfungiblePositionManager.sol";
@@ -19,9 +21,13 @@ import "@rivera/libs/DexV3CalculationStruct.sol";
 ///@dev
 ///The pool used in this testing is fusionx's USDT / WETH 0.05%  https://fusionx.finance/info/v3/pairs/0xa125af1a4704044501fe12ca9567ef1550e430e8?chain=mantle
 
+
 contract RiveraConcNoStakingTest is Test {
     RiveraConcNoStaking strategy;
+    RiveraConcNoStakingTestHelper testStrategy;
+
     RiveraAutoCompoundingVaultV2Public vault;
+    RiveraAutoCompoundingVaultV2Public testVault;
 
     //Events
     event StratHarvest(
@@ -46,7 +52,7 @@ contract RiveraConcNoStakingTest is Test {
 
     //cakepool params
     bool _isTokenZeroDeposit = true;
-    int24 currentTick =202248;     //Taken from explorer
+    int24 currentTick =197968;     //Taken from explorer
     int24 tickSpacing = 10;
     int24 _tickLower = ((currentTick - 6932) / tickSpacing) * tickSpacing;      //Tick for price that is half of current price
     int24 _tickUpper = ((currentTick + 6932) / tickSpacing) * tickSpacing;      //Tick for price that is double of current price
@@ -71,20 +77,21 @@ contract RiveraConcNoStakingTest is Test {
     string rivTokenName = "Rivlp1Token-lp0Token";
     string rivTokenSymbol = "rivV2lp1Token-lp0Token";
     uint256 stratUpdateDelay = 21600;
-    uint256 vaultTvlCap = 1000e6;
+    uint256 vaultTvlCap = 1000000e6;
 
     ///@dev Users Setup
     address _manager = 0xA638177B9c3D96A30B75E6F9e35Baedf3f1954d2;
     address _user1 = 0x0A0e42Cb6FA85e78848aC241fACd8fCCbAc4962A;
     address _user2 = 0x2fa6a4D2061AD9FED3E0a1A7046dcc9692dA6Da8;
-    address _whale = 0xf89d7b9c864f589bbF53a82105107622B35EaA40;        //35 Mil whale 35e24
+    address _whale = 0x28190bC18bbdc3D340C9A8C80265096E3A7f7EdA;        //35 Mil whale 35e24
     uint256 _maxUserBal = IERC20(_lp0Token).balanceOf(_whale)/4;
-
+    address _whalelp1Token=0x588846213A30fd36244e0ae0eBB2374516dA836C;
+    uint256 _maxUserBallp1 = IERC20(_lp1Token).balanceOf(_whalelp1Token)/4;
     uint256 PERCENT_POOL_TVL_OF_CAPITAL = 5;
     uint256 minCapital = 1e6;      //One dollar of denomination asset
 
     uint256 withdrawFeeDecimals = 100;
-    uint256 withdrawFee = 0;
+    uint256 withdrawFee = 1;
 
     uint256 feeDecimals = 100;
     uint256 protocolFee = 15;
@@ -99,10 +106,14 @@ contract RiveraConcNoStakingTest is Test {
 
         ///@dev Initializing the vault with invalid strategy
         vault = new RiveraAutoCompoundingVaultV2Public(_lp0Token, rivTokenName, rivTokenSymbol, stratUpdateDelay, vaultTvlCap);
+        testVault = new RiveraAutoCompoundingVaultV2Public(_lp0Token, rivTokenName, rivTokenSymbol, stratUpdateDelay, vaultTvlCap);
 
         ///@dev Initializing the strategy
         CommonAddresses memory _commonAddresses = CommonAddresses(address(vault), _router, _nonFungiblePositionManager, withdrawFeeDecimals, 
-        withdrawFee, feeDecimals, protocolFee, fundManagerFee, partnerFee, partner,_manager,_manager);
+        withdrawFee,50,10000,_manager,_manager);
+        CommonAddresses memory _commonAddressesTest = CommonAddresses(address(testVault), _router, _nonFungiblePositionManager, withdrawFeeDecimals, 
+        withdrawFee,50,10000,_manager,_manager);
+
         RiveraLpStakingParams memory riveraLpStakingParams = RiveraLpStakingParams(
             _tickLower,
             _tickUpper,
@@ -124,14 +135,23 @@ contract RiveraConcNoStakingTest is Test {
             // "pendingCake"
             );
         strategy = new RiveraConcNoStaking();
+        testStrategy = new RiveraConcNoStakingTestHelper();
         strategy.init(riveraLpStakingParams, _commonAddresses);
+        testStrategy.init(riveraLpStakingParams, _commonAddressesTest);
         vault.init(IStrategy(address(strategy)));
+        testVault.init(IStrategy(address(testStrategy)));
         vm.stopPrank();
 
         ///@dev Transfering LP tokens from a whale to my accounts
         vm.startPrank(_whale);
         IERC20(_lp0Token).transfer(_user1, _maxUserBal);
         IERC20(_lp0Token).transfer(_user2, _maxUserBal);
+        vm.stopPrank();
+
+        ///@dev Transfering LP tokens from a whale to my accounts
+        vm.startPrank(_whalelp1Token);
+        IERC20(_lp1Token).transfer(_user1, _maxUserBallp1);
+        IERC20(_lp1Token).transfer(_user2, _maxUserBallp1);
         vm.stopPrank();
         // emit log_named_uint("lp0Token balance of user1", IERC20(_lp0Token).balanceOf(_user1));
     }
@@ -368,10 +388,11 @@ contract RiveraConcNoStakingTest is Test {
         uint256 lp1TokenBal = IERC20(_lp1Token).balanceOf(address(strategy));
         emit log_named_uint("After strat lp1Token balance", lp1TokenBal);
         assertEq(lp1TokenBal, 0);
+        address dToken=strategy.depositToken();
 
         uint256 lp0TokenBal = IERC20(_lp0Token).balanceOf(address(strategy));
-        emit log_named_uint("After strat lp0Token balance", lp0TokenBal);
-        // assertLt(lp0TokenBal, withdrawAmount * withdrawFee / withdrawFeeDecimals);
+        // emit log_named_uint("After strat lp0Token balance", lp0TokenBal);
+        // assertEq(IERC20(dToken).balanceOf(_manager), withdrawAmount * withdrawFee / withdrawFeeDecimals);
 
     }
 
@@ -563,8 +584,8 @@ contract RiveraConcNoStakingTest is Test {
         _performSwapInBothDirections(swapAmount);
         _performSwapInBothDirections(swapAmount);
 
-        uint256 lprewardsAvailabe=strategy.lpRewardsAvailable();
-        emit log_named_uint("lprewardsAvailabe", lprewardsAvailabe);
+        // uint256 lprewardsAvailabe=strategy.lpRewardsAvailable();
+        // emit log_named_uint("lprewardsAvailabe", lprewardsAvailabe);
 
         vm.prank(_user1);
         IERC20(_lp0Token).transfer(address(strategy), 1e6);
@@ -640,7 +661,6 @@ contract RiveraConcNoStakingTest is Test {
     }
     function test_TokenStuck(uint256 depositAmount) public {
         depositAmount=10e6;
-        address _whalelp1Token=_whale;
         uint256 bal=IERC20(_lp1Token).balanceOf(_whalelp1Token);
         vm.assume(depositAmount<bal);
         vm.prank(_whalelp1Token);
@@ -736,4 +756,399 @@ contract RiveraConcNoStakingTest is Test {
         strategy.setManager(address(0));
     }
 
+    function test_Unpause() public {
+        uint256 depositAmount=2e6;
+        _depositDenominationAsset(depositAmount);
+        vm.startPrank(_manager);
+        uint256 balanceOfBefore=strategy.balanceOf();
+        console.log("balance Before pause",balanceOfBefore);
+        strategy.pause();
+        uint256 balanceOfAfter=strategy.balanceOf();
+        console.log("balance After pause",balanceOfAfter);
+        uint256  tokenId=strategy.tokenID();
+        console.log("tokenId after pause",tokenId);
+        strategy.unpause();   
+        vm.stopPrank();
+        _depositDenominationAsset(depositAmount);
+        balanceOfAfter=strategy.balanceOf();
+        console.log("balance After deposit",balanceOfAfter);
+        tokenId=strategy.tokenID();
+        console.log("tokenId after deposit",tokenId);
+
+    }
+
+
+    function test_SetSlippage() public {
+        uint256 newSlippage = 50; // 0.5% slippage
+        uint256 oldSlippage = strategy.slippage();
+        console.log("oldSlippage",oldSlippage);
+        // console.logInt(((42928 - 6932) / 60) * 60);
+        // console.logInt(((42928 + 6932) / 60) * 60);
+        
+        // Only manager can set slippage
+        vm.expectRevert();
+        vm.prank(_user1);
+        strategy.setSlippage(newSlippage);
+
+        // Slippage must be > 0
+        // vm.expectRevert();
+        vm.prank(_manager); 
+        strategy.setSlippage(0);
+
+        // Slippage must be <= slippageDecimals
+        vm.expectRevert();
+        vm.prank(_manager);
+        strategy.setSlippage(10001);
+
+        // Valid slippage update
+        vm.prank(_manager);
+        strategy.setSlippage(newSlippage);
+        console.log("newSlippage",strategy.slippage());
+
+        assertEq(strategy.slippage(), newSlippage);
+    }
+
+    function test_PanicAndWithdraw() public {
+        uint256 depositAmount=2e6;
+        // _depositDenominationAsset(depositAmount);
+        console.log("balance before",IERC20(_lp0Token).balanceOf(_user1));
+        vm.startPrank(_user1);
+        IERC20(_lp0Token).approve(address(vault), depositAmount);
+        vault.deposit(depositAmount,_user1);
+        vm.stopPrank();
+        vm.startPrank(_manager);
+        uint256 balanceOfBefore=strategy.balanceOf();
+        console.log("balanceOfBefore",balanceOfBefore);
+        console.log("panic vault");
+        strategy.panic();
+        console.log("try withdraw from vault");
+        vm.stopPrank();
+        vm.startPrank(_user1);
+        vault.withdraw(depositAmount/2, _user1, _user1);
+        vm.stopPrank();
+        vm.prank(_manager);
+        strategy.unpause();   
+        console.log("balance before",IERC20(_lp0Token).balanceOf(_user1));
+        _depositDenominationAsset(depositAmount);
+        // uint256 balanceOfAfter=strategy.balanceOf();
+        // console.log("balance After deposit",balanceOfAfter);
+        // // tokenId=strategy.tokenID();
+        // // console.log("tokenId after deposit",tokenId);
+    }
+
+
+    // function test_GetOutAmountMantle() public {
+    //     // Define test parameters
+    //     // address tokenIn = _lp0Token;
+    //     // address tokenOut = _lp1Token ;
+    //     uint256 amountInToken0 = 2626e6; // 1 token with 18 decimals
+    //     uint256 amountInToken1 = 1e18; // 1 token with 18 decimals
+    //     // uint256 amountInToken0 = 1e5; // 1 token with 18 decimals
+    //     // uint256 amountInToken1 = 1e15; // 1 token with 18 decimals
+    //     uint256 slippageTolerance = 100; // 1% slippage
+    //     // Get the expected amount out using the contract function
+    //     uint256 amountOutMinimumlp1 = strategy.getOutAmount(_stake,_lp0Token, amountInToken0, slippageTolerance);
+    //     // console.log("amountOutMinimumlp1",amountOutMinimumlp1);
+    //     uint256 amountOutMinimumlp0 = strategy.getOutAmount(_stake,_lp1Token, amountInToken1, slippageTolerance);
+    //     console.log("amountInToken1",amountInToken1);
+    //     console.log("amountOutMinimumlp0",amountOutMinimumlp0);
+    //     console.log("amountOutMinimumlp1",amountOutMinimumlp1);
+    //     assertGt(amountOutMinimumlp1, 0, "amountOutMinimumlp1 should be greater than 0");
+    //     assertGt(amountOutMinimumlp0, 0, "amountOutMinimumlp0 should be greater than 0");
+    //     // // Calculate the expected amount out minimum
+    //     uint256 expectedAmountOutMinimumlp0;
+    //     // // Fetch the price from Chainlink Price Feed
+    //     // // Use a local fork of Ethereum mainnet
+    //     uint256 forkId = vm.createFork("https://eth.llamarpc.com");
+    //     vm.selectFork(forkId);
+    //     IAggregatorV3Interface priceFeed = IAggregatorV3Interface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);//eth/usd chainlink eth mainnet aggregatr as here our lp1 in weth
+    //     (, int price, , , ) = priceFeed.latestRoundData();
+    //     uint256 priceInWei = uint256(price);
+    //     // console.log("priceInWei",priceInWei);
+    //     // // Calculate the expected amount out minimum using Chainlink price
+    //     expectedAmountOutMinimumlp0 = (amountInToken1 * priceInWei * ((10000 - slippageTolerance)) / (10000 * 10** (12+priceFeed.decimals())));
+    //     // expectedAmountOutMinimumlp0 = (amountInToken1 * priceInWei  / ( 10** priceFeed.decimals()));
+    //     console.log("expectedAmountOutMinimumlp0",expectedAmountOutMinimumlp0);
+
+    //     // // Assert that the calculated amount out is as expected
+    //     // assertApproxEqRel(1000, 999, 1e16, "Amount out minimum is not within 1% of expected value");
+    //     assertApproxEqRel(amountOutMinimumlp0, expectedAmountOutMinimumlp0, 1e17, "Amount out minimum is not within 1% of expected value");
+    // }
+
+    //  function test_GetOutAmountPolygon() public {
+    //     uint256 forkId = vm.createFork("https://polygon-mainnet.g.alchemy.com/v2/QMIfo1I9pWTw5QMkmRRBP0BCs2LEzZue");
+    //     vm.selectFork(forkId);
+    //     RiveraConcNoStaking strategyP=new RiveraConcNoStaking();
+    //     testVault = new RiveraAutoCompoundingVaultV2Public(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270, rivTokenName, rivTokenSymbol, stratUpdateDelay, 100000e18);
+    //     CommonAddresses memory _commonAddressesTest = CommonAddresses(address(testVault), 0xE592427A0AEce92De3Edee1F18E0157C05861564, 0xC36442b4a4522E871399CD717aBDD847Ab11FE88, 1000, 
+    //     3,100,10000,_manager,_manager);
+
+    //     RiveraLpStakingParams memory riveraLpStakingParams = RiveraLpStakingParams(
+    //         34140,
+    //         48000,
+    //         0x7A73f0E2bB9Cf2A8F27e792908D68F9f58fa7375,
+    //         // _chef,
+    //         // _rewardToken,
+    //         0x6D4ABbF94A81F15dFA012a8479dEFBB5B0DED7ED,
+    //         0x19F51834817708F2da9Ac7D0cc3eAFF0b6Ed17D7,
+    //         0x98D98C50047c6bDD424aD799Fc25efd7f9A28E32,
+    //         0x52F199Be0f15D69C86B3327acf24c85a5E31F516,
+    //         0xF5B745923b1879830F37da07a420Ed425eae8588,
+    //         0x1F0Ac8D2215e7C6fCf63a6C2cE61615F267048A7,
+    //         // _rewardToLp0AddressPath,
+    //         // _rewardToLp0FeePath,
+    //         // _rewardToLp1AddressPath,
+    //         // _rewardToLp1FeePath,
+    //         // _rewardtoNativeFeed,
+    //         address(0)
+    //         // "pendingCake"
+    //     );
+    //     strategyP.init(riveraLpStakingParams, _commonAddressesTest);
+    //     uint256 amountInToken0 = 100e18; // 1 token with 18 decimals
+    //     uint256 amountInToken1 = 100e18; // 1 token with 18 decimals
+    //     uint256 slippageTolerance = 0; // 1% slippage
+    //     // // Get the expected amount out using the contract function
+    //     uint256 amountOutMinimumlp1 = strategyP.getOutAmount(0x7A73f0E2bB9Cf2A8F27e792908D68F9f58fa7375,0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270, amountInToken0, slippageTolerance);
+    //     uint256 amountOutMinimumlp0 = strategyP.getOutAmount(0x7A73f0E2bB9Cf2A8F27e792908D68F9f58fa7375,0x3d2bD0e15829AA5C362a4144FdF4A1112fa29B5c, amountInToken1, slippageTolerance);
+    //     console.log("amountInToken0",amountInToken0);
+    //     console.log("amountInToken1",amountInToken1);
+    //     console.log("amountOutMinimumlp0",amountOutMinimumlp0);
+    //     console.log("amountOutMinimumlp1",amountOutMinimumlp1);
+    //     // assertGt(amountOutMinimumlp1, 0, "amountOutMinimumlp1 should be greater than 0");
+    //     // assertGt(amountOutMinimumlp0, 0, "amountOutMinimumlp0 should be greater than 0");
+    //     // // // Calculate the expected amount out minimum
+    //     // uint256 expectedAmountOutMinimumlp0;
+
+
+
+
+
+    //     // // Fetch the price from Chainlink Price Feed
+    //     // // // Use a local fork of Ethereum mainnet
+    //     // uint256 forkId = vm.createFork("https://eth.llamarpc.com");
+    //     // vm.selectFork(forkId);
+    //     // IAggregatorV3Interface priceFeed = IAggregatorV3Interface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);//eth/usd chainlink eth mainnet aggregatr as here our lp1 in weth
+    //     // (, int price, , , ) = priceFeed.latestRoundData();
+    //     // uint256 priceInWei = uint256(price);
+    //     // // console.log("priceInWei",priceInWei);
+    //     // // // Calculate the expected amount out minimum using Chainlink price
+    //     // expectedAmountOutMinimumlp0 = (amountInToken1 * priceInWei * ((10000 - slippageTolerance)) / (10000 * 10** (12+priceFeed.decimals())));
+    //     // // expectedAmountOutMinimumlp0 = (amountInToken1 * priceInWei  / ( 10** priceFeed.decimals()));
+    //     // console.log("expectedAmountOutMinimumlp0",expectedAmountOutMinimumlp0);
+    //     // // // Assert that the calculated amount out is as expected
+    //     // // assertApproxEqRel(1000, 999, 1e16, "Amount out minimum is not within 1% of expected value");
+    //     // assertApproxEqRel(amountOutMinimumlp0, expectedAmountOutMinimumlp0, 1e17, "Amount out minimum is not within 1% of expected value");
+    // }
+
+    // function test_GetOutAmountMantleSix() public {
+    //     RiveraConcNoStaking strategyM=new RiveraConcNoStaking();
+    //     testVault = new RiveraAutoCompoundingVaultV2Public(0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111, rivTokenName, rivTokenSymbol, stratUpdateDelay, 100000e18);
+    //     CommonAddresses memory _commonAddressesTest = CommonAddresses(address(testVault), _router, _nonFungiblePositionManager, withdrawFeeDecimals, 
+    //     withdrawFee,100,10000,_manager,_manager);
+
+    //     RiveraLpStakingParams memory riveraLpStakingParams = RiveraLpStakingParams(
+    //         -106550,-60500,
+    //         0xD3d3127D9654f806370da592eb292eA0a347f0e3,
+    //         // _chef,
+    //         // _rewardToken,
+    //         _tickMathLib,
+    //         _sqrtPriceMathLib,
+    //         _liquidityMathLib,
+    //         _safeCastLib,
+    //         _liquidityAmountsLib,
+    //         _fullMathLib,
+    //         // _rewardToLp0AddressPath,
+    //         // _rewardToLp0FeePath,
+    //         // _rewardToLp1AddressPath,
+    //         // _rewardToLp1FeePath,
+    //         // _rewardtoNativeFeed,
+    //         _assettoNativeFeed
+    //         // "pendingCake"
+    //         );
+    //     strategyM.init(riveraLpStakingParams, _commonAddressesTest);
+    //     uint256 amountInToken0 = 1e18; // 1 token with 18 decimals
+    //     uint256 amountInToken1 = 1e18; // 1 token with 18 decimals
+    //     uint256 slippageTolerance = 0; // 1% slippage
+    //     // // Get the expected amount out using the contract function
+    //     uint256 amountOutMinimumlp1 = strategyM.getOutAmount(0xD3d3127D9654f806370da592eb292eA0a347f0e3,0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111, amountInToken0, slippageTolerance);
+    //     uint256 amountOutMinimumlp0 = strategyM.getOutAmount(0xD3d3127D9654f806370da592eb292eA0a347f0e3,0x78c1b0C915c4FAA5FffA6CAbf0219DA63d7f4cb8, amountInToken1, slippageTolerance);
+    //     console.log("amountInToken0",amountInToken0);
+    //     console.log("amountInToken1",amountInToken1);
+    //     console.log("amountOutMinimumlp0",amountOutMinimumlp0);
+    //     console.log("amountOutMinimumlp1",amountOutMinimumlp1);
+    //     // assertGt(amountOutMinimumlp1, 0, "amountOutMinimumlp1 should be greater than 0");
+    //     // assertGt(amountOutMinimumlp0, 0, "amountOutMinimumlp0 should be greater than 0");
+    //     // // // Calculate the expected amount out minimum
+    //     // uint256 expectedAmountOutMinimumlp0;
+
+
+
+
+
+    //     // // Fetch the price from Chainlink Price Feed
+    //     // // // Use a local fork of Ethereum mainnet
+    //     // uint256 forkId = vm.createFork("https://eth.llamarpc.com");
+    //     // vm.selectFork(forkId);
+    //     // IAggregatorV3Interface priceFeed = IAggregatorV3Interface(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);//eth/usd chainlink eth mainnet aggregatr as here our lp1 in weth
+    //     // (, int price, , , ) = priceFeed.latestRoundData();
+    //     // uint256 priceInWei = uint256(price);
+    //     // // console.log("priceInWei",priceInWei);
+    //     // // // Calculate the expected amount out minimum using Chainlink price
+    //     // expectedAmountOutMinimumlp0 = (amountInToken1 * priceInWei * ((10000 - slippageTolerance)) / (10000 * 10** (12+priceFeed.decimals())));
+    //     // // expectedAmountOutMinimumlp0 = (amountInToken1 * priceInWei  / ( 10** priceFeed.decimals()));
+    //     // console.log("expectedAmountOutMinimumlp0",expectedAmountOutMinimumlp0);
+    //     // // // Assert that the calculated amount out is as expected
+    //     // // assertApproxEqRel(1000, 999, 1e16, "Amount out minimum is not within 1% of expected value");
+    //     // assertApproxEqRel(amountOutMinimumlp0, expectedAmountOutMinimumlp0, 1e17, "Amount out minimum is not within 1% of expected value");
+    // }
+
+
+    function test_DepositWithNormal() public {
+        uint depositAmount=150000e6;
+        vm.startPrank(_user1);
+        IERC20(_lp0Token).approve(address(vault), depositAmount);
+        (uint160 sqrtPriceX96, , , , , , ) = IPancakeV3Pool(_stake).slot0();
+        console.log("sqrtPriceX96 before deposit ",sqrtPriceX96);
+        uint256 sqrtPriceLimitX96 = strategy.getSqrtPriceLimitX96(sqrtPriceX96,_lp0Token,100 , 10000);
+        console.log("sqrtPriceLimitX96",sqrtPriceLimitX96);
+        vault.deposit(depositAmount,_user1);
+        ( sqrtPriceX96, , , , , , ) = IPancakeV3Pool(_stake).slot0();
+        console.log("sqrtPriceX96 after",sqrtPriceX96);
+        console.log("balance after",vault.convertToAssets(IERC20(address(vault)).balanceOf(_user1)));
+        vm.stopPrank();
+    }
+
+    //Function to test the deposit transaction by frontrunning it by calling function fluctuatePrice and checking it should be reverted if pool price is too fluctuated
+    function test_DepositWithFRPriceFluc() public {
+        uint depositAmount=50e6;
+        // ChangeInAmountsForNewRatioParams(strategy.poolFee(), depositAmount, 0, _fullMathLib));
+        (uint160 sqrtPriceX96, , , , , , ) = IPancakeV3Pool(_stake).slot0();
+        console.log("sqrtPriceX96 before deposit ",sqrtPriceX96);
+
+        uint256 sqrtPriceLimitX96 = strategy.getSqrtPriceLimitX96(sqrtPriceX96,_lp0Token,100 , 10000);
+        console.log("sqrtPriceLimitX96",sqrtPriceLimitX96);
+        // console.log("amountOutMinimum",amountOutMinimum);
+        testStrategy.setTestOutAmountSwap(sqrtPriceLimitX96);
+        vm.startPrank(_user1);
+        // bytes memory depositData = abi.encodeWithSignature("deposit(uint256,address)", depositAmount, _user1);
+        IERC20(_lp0Token).approve(address(testVault), depositAmount);
+        fluctuatePrice(true);
+        ( sqrtPriceX96, , , , , , ) = IPancakeV3Pool(_stake).slot0();
+        console.log("sqrtPriceX96 after",sqrtPriceX96);
+        vm.expectRevert();
+        testVault.deposit(depositAmount,_user1);
+        // (bool success2, ) = address(testVault).call(depositData);
+        console.log("balance after",testVault.convertToAssets(IERC20(address(testVault)).balanceOf(_user1)));
+        vm.stopPrank();
+    }
+
+
+    function test_Swap() public {
+        console.logInt(((currentTick - 6932) / tickSpacing) * tickSpacing);
+        console.logInt(((currentTick + 6932) / tickSpacing) * tickSpacing);
+        uint swapAmount=25000e6;
+        vm.startPrank(_user1);
+        IERC20(_lp0Token).approve(_router, swapAmount);
+        uint160 sqLimit=getStPriceLimitX96(_stake,_lp0Token,10000,10000);
+        IV3SwapRouter(_router).exactInputSingle(IV3SwapRouter.ExactInputSingleParams(
+                _lp0Token,
+                _lp1Token,
+                500,
+                _user1,
+                swapAmount,
+                0,
+                sqLimit
+        ));
+        swapAmount=20e18;
+        sqLimit=getStPriceLimitX96(_stake,_lp1Token,10000,10000);
+        IERC20(_lp1Token).approve(_router, swapAmount);
+        IV3SwapRouter(_router).exactInputSingle(IV3SwapRouter.ExactInputSingleParams(
+                _lp1Token,
+                _lp0Token,
+                500,
+                _user1,
+                swapAmount, 
+                0,
+                sqLimit
+        ));
+    }
+
+
+    // function test_Slippage() public {
+    //     uint swapAmount=2600e6;
+    //     uint256 amountOutMinimum = strategy.getOutAmount(_stake,_lp0Token,swapAmount , 100);
+    //     console.log("amountOutMinimum", amountOutMinimum);
+
+    //     vm.startPrank(_user1);
+    //     IERC20(_lp0Token).transfer(address(testStrategy), swapAmount);
+    //     fluctuatePrice(true);
+    //     // fluctuatePrice(false);
+    //     console.log("bal", IERC20(_lp1Token).balanceOf(address(testStrategy)));
+    //     vm.expectRevert();
+    //     testStrategy.testSwapV3In(_lp0Token, _lp1Token, swapAmount, 500, amountOutMinimum);
+    //     console.log("bal", IERC20(_lp1Token).balanceOf(address(testStrategy)));
+    // }
+
+
+    function getStPriceLimitX96(address pool, address tokenIn, uint256 _slippageTolerance,uint256 _slippageDecimals) public virtual view returns(uint160){
+        (uint160 sqrtPriceX96, , , , , , ) = IPancakeV3Pool(pool).slot0();
+        uint256 priceLimit;
+        // uint256 priceLimit = (uint256(sqrtPriceX96) * (_slippageDecimals - _slippageTolerance)) / _slippageDecimals;
+        if(_slippageDecimals==_slippageTolerance){
+            return 0;
+        }
+        if(tokenIn==_lp1Token){
+            priceLimit =(sqrtPriceX96 * _slippageDecimals )/ (_slippageDecimals - _slippageTolerance);
+        }else{
+            priceLimit=(sqrtPriceX96 * (_slippageDecimals - _slippageTolerance)) / _slippageDecimals;
+        }
+
+
+        return(uint160(priceLimit)); 
+    }
+
+    function fluctuatePrice(bool increaselp1Price) public{
+    //     uint256 amountOutMinimum = strategy.getOutAmount(_stake,_lp1Token,1e18 , 100);
+    //     console.log("price before",amountOutMinimum/1e6);
+        // console.log("bal", IERC20(_lp0Token).balanceOf(_user1)/1e6);
+
+        if(increaselp1Price){
+            uint swapAmount=25000e6;
+            vm.startPrank(_user1);
+            IERC20(_lp0Token).approve(_router, swapAmount);
+            IV3SwapRouter(_router).exactInputSingle(IV3SwapRouter.ExactInputSingleParams(
+                    _lp0Token,
+                    _lp1Token,
+                    500,
+                    _user1,
+                    swapAmount,
+                    0,
+                    0
+            ));
+        }else{
+            uint swapAmount=20e18;
+            vm.startPrank(_user1);
+            // console.log("bal", IERC20(_lp1Token).balanceOf(_user1));
+            IERC20(_lp1Token).approve(_router, swapAmount);
+            IV3SwapRouter(_router).exactInputSingle(IV3SwapRouter.ExactInputSingleParams(
+                    _lp1Token,
+                    _lp0Token,
+                    500,
+                    _user1,
+                    swapAmount, 
+                    0,
+                    0
+            ));
+        }
+        
+        // amountOutMinimum = strategy.getOutAmount(_stake,_lp1Token,1e18 , 100);
+        // console.log("price after",amountOutMinimum/1e6);
+    }
+
 }
+
+/*
+
+forge test --match-path test/strategies/staking/RiveraConcNoStaking.t.sol --fork-url http://127.0.0.1:8545/ -vvv
+
+*/

@@ -1,6 +1,7 @@
 pragma solidity ^0.8.0;
-
+// import "hardhat/console.sol"; 
 import "@openzeppelin/token/ERC20/IERC20.sol";
+import "@openzeppelin/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/access/Ownable.sol";
 import "@openzeppelin/security/Pausable.sol";
@@ -38,11 +39,8 @@ struct CommonAddresses {
     address NonfungiblePositionManager;
     uint256 withdrawFeeDecimals;
     uint256 withdrawFee;
-    uint256 feeDecimals;
-    uint256 protocolFee;
-    uint256 fundManagerFee;
-    uint256 partnerFee;
-    address partner;
+    uint256 slippage;
+    uint256 slippageDecimals;////If wee put decimals  10000 then 100 will be 1 %
     address manager;
     address owner;
 }
@@ -84,6 +82,7 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
     event Withdraw(uint256 tvl, uint256 amount);
     event RangeChange(int24 tickLower, int24 tickUpper);
     event AssetToNativeFeedChange(address oldFeed, address newFeed);
+    event SlippageChange(uint256 oldSlippage,uint256 newSlippage);
 
     ///@dev
     ///@param _riveraLpStakingParams: Has the pool specific params
@@ -113,11 +112,8 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
         withdrawFeeDecimals = _commonAddresses.withdrawFeeDecimals;
         withdrawFee = _commonAddresses.withdrawFee;
 
-        feeDecimals = _commonAddresses.feeDecimals;
-        protocolFee = _commonAddresses.protocolFee;
-        fundManagerFee = _commonAddresses.fundManagerFee;
-        partnerFee = _commonAddresses.partnerFee;
-        partner = _commonAddresses.partner;
+        slippage = _commonAddresses.slippage;
+        slippageDecimals = _commonAddresses.slippageDecimals;
         _transferManagership(_commonAddresses.manager);
         _transferOwnership(_commonAddresses.owner);
         _giveAllowances();
@@ -186,7 +182,7 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
             );
     }
 
-    function _burnAndCollectV3(bool _charge) internal nonReentrant  {
+    function _burnAndCollectV3() internal nonReentrant  {
         uint128 liquidity = liquidityBalance();
         require(liquidity > 0, "No Liquidity available");
         INonfungiblePositionManager(NonfungiblePositionManager).collect(
@@ -197,10 +193,7 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
                 type(uint128).max
             )
         );
-        if(_charge==true){
-            _chargeFees(lpToken0);
-            _chargeFees(lpToken1);
-        }
+       
         INonfungiblePositionManager(NonfungiblePositionManager)
             .decreaseLiquidity(
                 INonfungiblePositionManager.DecreaseLiquidityParams(
@@ -242,7 +235,7 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
     function changeRange(int24 _tickLower, int24 _tickUpper) external virtual {
         _checkOwner();
         DexV3Calculations.checkTicks(tickLower, tickUpper, _tickLower, _tickUpper, tickMathLib, stake);
-        _burnAndCollectV3(true);        //This will return token0 and token1 in a ratio that is corresponding to the current range not the one we're setting it to
+        _burnAndCollectV3();        //This will return token0 and token1 in a ratio that is corresponding to the current range not the one we're setting it to
         tickLower = _tickLower;
         tickUpper = _tickUpper;
         _deposit();
@@ -297,8 +290,6 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
             )
         );
         lastHarvest = block.timestamp;
-        _chargeFees(lpToken0);
-        _chargeFees(lpToken1);
         _deposit();
         emit StratHarvest(
                 msg.sender,
@@ -306,18 +297,7 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
             );
     }
 
-    function _chargeFees(address token) internal {
-        uint256 tokenBal = IERC20(token).balanceOf(address(this));
-
-        uint256 protocolFeeAmount = tokenBal * protocolFee / feeDecimals;
-        IERC20(token).safeTransfer(manager, protocolFeeAmount);
-
-        uint256 fundManagerFeeAmount = tokenBal * fundManagerFee / feeDecimals;
-        IERC20(token).safeTransfer(owner(), fundManagerFeeAmount);
-
-        uint256 partnerFeeAmount = tokenBal * partnerFee / feeDecimals;
-        IERC20(token).safeTransfer(partner, partnerFeeAmount);
-    }
+  
 
     function _lptoDepositTokenSwap(uint256 amount0, uint256 amount1) internal returns (uint256 totalDepositAsset) {
         uint256 amountOut;
@@ -346,6 +326,8 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
         uint256 amountIn,
         uint24 fee
     ) internal returns (uint256 amountOut) {
+        (uint160 sq0, , , , , , ) = IPancakeV3Pool(stake).slot0();
+        uint160 sqrtPriceLimitX96 = getSqrtPriceLimitX96(sq0,tokenIn,slippage,slippageDecimals);// 1% is 100 sq1
         amountOut = IV3SwapRouter(router).exactInputSingle(
             IV3SwapRouter.ExactInputSingleParams(
                 tokenIn,
@@ -354,31 +336,24 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
                 address(this),
                 amountIn,
                 0,
-                0
-            )
+                sqrtPriceLimitX96
+            )   
         );
     }
 
-    function _swapV3PathIn(
-        address[] memory tokenPath,
-        uint24[] memory feePath,
-        uint256 amountIn
-    ) internal returns (uint256 amountOut) {
-
-        bytes memory path = abi.encodePacked(tokenPath[0]);
-        
-        for (uint256 i = 0; i < feePath.length; i++) {
-            path = abi.encodePacked(path, feePath[i], tokenPath[i+1]);
+    function getSqrtPriceLimitX96(uint160 sqrtPriceX96,address tokenIn, uint256 _slippageTolerance,uint256 _slippageDecimals) public virtual view returns(uint160){
+        // (uint160 sqrtPriceX96, , , , , , ) = IPancakeV3Pool(pool).slot0();
+        uint256 priceLimit; 
+        if(_slippageDecimals==_slippageTolerance){
+            return 0;
         }
 
-        amountOut = IV3SwapRouter(router).exactInput(
-            IV3SwapRouter.ExactInputParams(
-                path,
-                address(this),
-                amountIn,
-                0
-            )
-        );
+        if(tokenIn==lpToken1){
+            priceLimit =(sqrtPriceX96 * _slippageDecimals )/ (_slippageDecimals - _slippageTolerance);
+        }else{
+            priceLimit=(sqrtPriceX96 * (_slippageDecimals - _slippageTolerance)) / _slippageDecimals;
+        }
+        return(uint160(priceLimit)); 
     }
 
     function balanceOf() public view returns (uint256) {
@@ -400,36 +375,17 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
         }
     }
 
-    // function rewardsAvailable() public view returns (uint256 rewardsAvbl) {
-    //     if(!hasFarm){
-    //         return 0;
-    //     }
-    //     // string memory signature = StringUtils.concat(
-    //     //     pendingRewardsFunctionName,
-    //     //     "(uint256)"
-    //     // );
-    //     // bytes memory result = Address.functionStaticCall(
-    //     //     chef,
-    //     //     abi.encodeWithSignature(signature, tokenID )
-    //     // );
-    //     // rewardsAvbl= abi.decode(result, (uint256));
-    // }
-
-    // function lpRewardsAvailable() public view returns (uint256 lpFeesDepositToken) {
-    //     lpFeesDepositToken = DexV3Calculations.unclaimedFeesOfLpPosition(UnclaimedLpFeesParams(depositToken == lpToken0, tokenID, stake, NonfungiblePositionManager, fullMathLib));
-    // }
-
     // called as part of strat migration. Sends all the available funds back to the vault.
     function retireStrat() external {
         onlyVault();
-        _burnAndCollectV3(false);
+        _burnAndCollectV3();
         IERC20(depositToken).safeTransfer(vault, _lptoDepositTokenSwap(IERC20(lpToken0).balanceOf(address(this)), IERC20(lpToken1).balanceOf(address(this))));
     }
 
     // pauses deposits and withdraws all funds from third party systems.
     function panic() public {
         onlyManager();
-        _burnAndCollectV3(false);
+        _burnAndCollectV3();
         IERC20(depositToken).safeTransfer(vault, _lptoDepositTokenSwap(IERC20(lpToken0).balanceOf(address(this)), IERC20(lpToken1).balanceOf(address(this))));
         pause();
     }
@@ -475,6 +431,14 @@ contract RiveraConcNoStaking is FeeManager, ReentrancyGuard, ERC721Holder, Initi
         IERC20(lpToken1).safeApprove(router, 0);
         IERC20(lpToken0).safeApprove(NonfungiblePositionManager, 0);
         IERC20(lpToken1).safeApprove(NonfungiblePositionManager, 0);
+    }
+
+
+    function setSlippage(uint256 _slippage) external {
+        onlyManager();
+        require(_slippage >= 0 && _slippage <= slippageDecimals, "Invalid slippage");
+        emit SlippageChange(slippage, _slippage);
+        slippage = _slippage;
     }
 
     function inCaseTokensGetStuck(address _token) external {

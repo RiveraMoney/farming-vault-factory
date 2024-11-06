@@ -35,11 +35,14 @@ struct FeeParams {
     uint256 withdrawFeeDecimals;//100
     uint256 withdrawFee;//0
 
-    uint256 feeDecimals;//100
-    uint256 protocolFee;//15
-    uint256 fundManagerFee;//0
-    uint256 partnerFee;//0
-    address partner;//
+    // uint256 feeDecimals;//100
+    // uint256 protocolFee;//15
+    // uint256 fundManagerFee;//0
+    // uint256 partnerFee;//0
+    // address partner;//
+    uint256 slippage;//0
+    uint256 slippageDecimals;//0
+
 }
 
 
@@ -65,23 +68,20 @@ interface IRiveraVaultFactoryV2
 contract DeployPublicVaultV2MantleMainnet is Script {
 
     //factoru
-    IRiveraVaultFactoryV2 _factory=IRiveraVaultFactoryV2(0xf4a048f424C1e9DFf7C70e59aa0D18909B5091Ac);
-    address _stake = 0xA125AF1A4704044501Fe12Ca9567eF1550E430e8;//mainnet
-    address _lpToken0=0x201EBa5CC46D216Ce6DC03F6a759e8E766e956aE;//mainnnet
-    address _lpToken1=0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111;//mainnnet
+    IRiveraVaultFactoryV2 _factory=IRiveraVaultFactoryV2(0xD4Fa73D0aDfc96Ff41DdB48e6Acdc25F81649c3D);
+    address _stake = 0x7A73f0E2bB9Cf2A8F27e792908D68F9f58fa7375;//mainnet mantlke
+    address _lpToken0=0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;//mainnnetmantlke
+    address _lpToken1=0x3d2bD0e15829AA5C362a4144FdF4A1112fa29B5c;//mainnnetmantlke
     address depositToken=_lpToken0;
-    int24 _tickLower = 179390;
-    int24 _tickUpper = 225450;
-    string _tokenName="RIV-01-06-A75";
-    string _tokenSymbol="RIV-01-06-A75";
-    uint256 vaultTvlCap = 100000e6;
+    int24 _tickLower = 34140;
+    int24 _tickUpper = 48000;
+    string _tokenName="RIV-01-02-T";
+    string _tokenSymbol="RIV-01-02-T";
+    uint256 vaultTvlCap = 10000e18;
     uint256 _withdrawFeeDecimals=1000;
     uint256 _withdrawFee=3;
-    uint256 _feeDecimals=100;
-    uint256 _protocolFee=15;
-    uint256 _fundManagerFee=0;
-    uint256 _partnerFee=0;
-    address _partner=0x961Ef0b358048D6E34BDD1acE00D72b37B9123D7;
+    uint256 _slippage=100;
+    uint256 _slippageDecimals=10000;
     address  assettoNativeFeed=address(0);
     address _user1;
     address _user2;
@@ -101,12 +101,12 @@ contract DeployPublicVaultV2MantleMainnet is Script {
     // string pendingReward="pendingFusionX";
     // address _reward = 0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82;
     // //libraries
-    address _tickMathLib =0x74C5E75798b33D38abeE64f7EC63698B7e0a10f1;
-    address _sqrtPriceMathLib = 0xA38Bf51645D77bd0ec5072Ae5eCA7c0e67CFc081;
-    address _liquidityMathLib = 0xe6d2bD39aEFCDCFC989B03AE45A5aBEfe9BF1F51;
-    address _safeCastLib = 0x55FD5B67B115767036f9e8af569B281A8A544a12;
-    address _liquidityAmountsLib =0xE344B76f1Dec90E8a2e68fa7c1cfEBB329aFB332;
-    address _fullMathLib = 0xAa5Fd782B03Bfb2f25F13B6ae4e254F5149B9575;
+    address _tickMathLib =0x6D4ABbF94A81F15dFA012a8479dEFBB5B0DED7ED;
+    address _sqrtPriceMathLib = 0x19F51834817708F2da9Ac7D0cc3eAFF0b6Ed17D7;
+    address _liquidityMathLib = 0x98D98C50047c6bDD424aD799Fc25efd7f9A28E32;
+    address _safeCastLib = 0x52F199Be0f15D69C86B3327acf24c85a5E31F516;
+    address _liquidityAmountsLib =0xF5B745923b1879830F37da07a420Ed425eae8588;
+    address _fullMathLib = 0x1F0Ac8D2215e7C6fCf63a6C2cE61615F267048A7;
 
     //usdt bnb pool
 
@@ -153,10 +153,7 @@ contract DeployPublicVaultV2MantleMainnet is Script {
         uint256 privateKey10 = vm.deriveKey(seedPhrase,9);
         _user10 =vm.addr(privateKey10);
 
-        console.log("user1",_user1);
-        console.log("user2",_user2);
-        console.log("user3",_user3);
-        console.log("user4",_user4);
+        // console.log("user1", 
 
     }
 
@@ -193,11 +190,8 @@ contract DeployPublicVaultV2MantleMainnet is Script {
         FeeParams memory feeParams = FeeParams(
             _withdrawFeeDecimals,
             _withdrawFee,
-            _feeDecimals,
-            _protocolFee,
-            _fundManagerFee,
-            _partnerFee,
-            _partner
+            _slippage,
+            _slippageDecimals
         );
         address vaultDeployed = _createVault(_factory,createVaultParamsFsxPool,feeParams);
         console.log("Vault",vaultDeployed);
@@ -206,7 +200,9 @@ contract DeployPublicVaultV2MantleMainnet is Script {
         address[] memory vault=_factory.listAllVaults();
         console.log("all vaults",vault.length);
         console.log("======================Deposit in Vault====================");
-        uint256 depositAmount1=IERC20(depositToken).balanceOf(_user3)/3;///vault 1 deposit amount
+        uint256 depositAmount1=IERC20(depositToken).balanceOf(_user3);///vault 1 deposit amount
+        
+        console.log("depositAmount1",depositAmount1);
         vm.startBroadcast(_privateKey3);
         IERC20(depositToken).approve(vaultDeployed, depositAmount1);
         RiveraAutoCompoundingVaultV2Public(vaultDeployed).deposit(depositAmount1, _user3);

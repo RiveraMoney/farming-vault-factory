@@ -9,9 +9,11 @@ import "@rivera/factories/staking/RiveraALMStrategyFactory.sol";
 
 contract DeployRiveraFactoryV2MantleMainnet is Script {
   
-    // address _chef = 0x9316938Eaa09E71CBB1Bf713212A42beCBa2998F;//testnet till we get mainnet address
-    address _router = 0x4bf659cA398A73AaF73818F0c64c838B9e229c08;//maninnet
-    address _NonfungiblePositionManager =0x5752F085206AB87d8a5EF6166779658ADD455774;//maninnet
+    address _router = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;//maninnet polygon
+    address _NonfungiblePositionManager =0xC36442b4a4522E871399CD717aBDD847Ab11FE88;//maninnet polygon
+
+    // address _router = 0x4bf659cA398A73AaF73818F0c64c838B9e229c08;//maninnet mangtle
+    // address _NonfungiblePositionManager =0x5752F085206AB87d8a5EF6166779658ADD455774;//maninnet mangtle
     VaultType _vaultType = VaultType.PUBLIC;
 
     function run() public {

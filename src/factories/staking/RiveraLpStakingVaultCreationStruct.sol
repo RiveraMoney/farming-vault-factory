@@ -27,12 +27,8 @@ struct RiveraVaultParams {
 struct FeeParams {
     uint256 withdrawFeeDecimals;
     uint256 withdrawFee;
-
-    uint256 feeDecimals;
-    uint256 protocolFee;
-    uint256 fundManagerFee;
-    uint256 partnerFee;
-    address partner;
+    uint256 slippage;
+    uint256 slippageDecimals;
 }
 
 struct LendingMarketNeutralParams {
